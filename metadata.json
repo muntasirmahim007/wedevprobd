@@ -1,0 +1,7 @@
+{
+  "name": "ডিজিটাল শপ ও লার্নিং একাডেমি",
+  "description": "বাংলা ই-কমার্স এবং অনলাইন কোর্স প্ল্যাটফর্ম - প্রোডাক্ট অর্ডার, হোয়াটসঅ্যাপ বাই, অর্ডার ট্র্যাকিং এবং ক্লাউডফ্লেয়ার স্ট্রিম ভিডিও কোর্স সহ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
