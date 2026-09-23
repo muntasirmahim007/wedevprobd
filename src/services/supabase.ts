@@ -6,13 +6,53 @@ const DEFAULT_URL = 'https://yablzflpgahtidyjhgzj.supabase.co';
 const DEFAULT_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhYmx6ZmxwZ2FodGlkeWpoZ3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNDU0MjcsImV4cCI6MjEwNTcyMTQyN30.qB0dQnKeTosFAjYgGQOcmVnDWO1uCAhUqHU6RpnF5nY';
 
-// Retrieve from Vite environment variables
-const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+// Retrieve from Vite environment variables or process.env safely
+const envUrl = (
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ||
+  (typeof process !== 'undefined' && process.env && process.env.VITE_SUPABASE_URL) ||
+  ''
+).trim();
+
+const envKey = (
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ||
+  (typeof process !== 'undefined' && process.env && process.env.VITE_SUPABASE_ANON_KEY) ||
+  ''
+).trim();
 
 // Local storage override option for quick UI testing or dynamic input
 const STORAGE_KEY_URL = 'digitalshop_supabase_url';
 const STORAGE_KEY_KEY = 'digitalshop_supabase_key';
+
+const getLocalStorageItem = (key: string): string => {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    try {
+      return localStorage.getItem(key) || '';
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
+const setLocalStorageItem = (key: string, val: string): void => {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(key, val);
+    } catch {
+      // ignore
+    }
+  }
+};
+
+const removeLocalStorageItem = (key: string): void => {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+};
 
 /**
  * Parses dashboard URLs or raw project IDs into the correct API URL
@@ -32,8 +72,8 @@ export const formatSupabaseUrl = (input: string): string => {
 };
 
 export const getSupabaseConfig = () => {
-  const localUrl = localStorage.getItem(STORAGE_KEY_URL);
-  const localKey = localStorage.getItem(STORAGE_KEY_KEY);
+  const localUrl = getLocalStorageItem(STORAGE_KEY_URL);
+  const localKey = getLocalStorageItem(STORAGE_KEY_KEY);
   const url = formatSupabaseUrl(localUrl || envUrl || DEFAULT_URL);
   const anonKey = (localKey || envKey || DEFAULT_KEY).trim();
   return {
@@ -47,15 +87,15 @@ export const setSupabaseConfig = (url: string, anonKey: string) => {
   clientInstance = null; // Invalidate previous client instance
   const formattedUrl = formatSupabaseUrl(url);
   if (formattedUrl) {
-    localStorage.setItem(STORAGE_KEY_URL, formattedUrl);
+    setLocalStorageItem(STORAGE_KEY_URL, formattedUrl);
   } else {
-    localStorage.removeItem(STORAGE_KEY_URL);
+    removeLocalStorageItem(STORAGE_KEY_URL);
   }
 
   if (anonKey.trim()) {
-    localStorage.setItem(STORAGE_KEY_KEY, anonKey.trim());
+    setLocalStorageItem(STORAGE_KEY_KEY, anonKey.trim());
   } else {
-    localStorage.removeItem(STORAGE_KEY_KEY);
+    removeLocalStorageItem(STORAGE_KEY_KEY);
   }
 };
 
@@ -119,6 +159,194 @@ export const testSupabaseConnection = async (): Promise<{ success: boolean; mess
   }
 };
 
+// ================== DATA MAPPERS (camelCase <-> snake_case) ==================
+
+export const productToDb = (p: Product) => ({
+  id: p.id,
+  title: p.title,
+  description: p.description,
+  price: p.price,
+  original_price: p.originalPrice || null,
+  type: p.type || 'product',
+  category: p.category,
+  image: p.image,
+  featured: !!p.featured,
+  delivery_time: p.deliveryTime || null,
+  features: p.features || [],
+  created_at: p.createdAt || new Date().toISOString()
+});
+
+export const productFromDb = (d: any): Product => ({
+  id: d.id,
+  title: d.title,
+  description: d.description || '',
+  price: Number(d.price),
+  originalPrice: d.original_price ? Number(d.original_price) : undefined,
+  type: d.type || 'product',
+  category: d.category,
+  image: d.image,
+  featured: !!d.featured,
+  deliveryTime: d.delivery_time || undefined,
+  features: Array.isArray(d.features) ? d.features : [],
+  createdAt: d.created_at || new Date().toISOString()
+});
+
+export const courseToDb = (c: Course) => ({
+  id: c.id,
+  title: c.title,
+  description: c.description,
+  price: c.price,
+  original_price: c.originalPrice || null,
+  thumbnail: c.thumbnail,
+  category: c.category,
+  instructor: c.instructor,
+  total_duration: c.totalDuration || null,
+  total_lessons: c.totalLessons || 0,
+  level: c.level || 'বিগিনার',
+  skills_learned: c.skillsLearned || [],
+  created_at: c.createdAt || new Date().toISOString()
+});
+
+export const courseFromDb = (d: any): Course => ({
+  id: d.id,
+  title: d.title,
+  description: d.description || '',
+  price: Number(d.price),
+  originalPrice: d.original_price ? Number(d.original_price) : undefined,
+  thumbnail: d.thumbnail,
+  category: d.category,
+  instructor: d.instructor,
+  totalDuration: d.total_duration || '',
+  totalLessons: Number(d.total_lessons || 0),
+  level: d.level || 'বিগিনার',
+  skillsLearned: Array.isArray(d.skills_learned) ? d.skills_learned : [],
+  createdAt: d.created_at || new Date().toISOString()
+});
+
+export const lessonToDb = (l: Lesson) => ({
+  id: l.id,
+  course_id: l.courseId,
+  title: l.title,
+  cloudflare_video_id: l.cloudflareVideoId,
+  duration: l.duration,
+  order_index: l.orderIndex,
+  is_free_preview: !!l.isFreePreview,
+  notes: l.notes || null
+});
+
+export const lessonFromDb = (d: any): Lesson => ({
+  id: d.id,
+  courseId: d.course_id,
+  title: d.title,
+  cloudflareVideoId: d.cloudflare_video_id,
+  duration: d.duration,
+  orderIndex: Number(d.order_index || 1),
+  isFreePreview: !!d.is_free_preview,
+  notes: d.notes || undefined
+});
+
+export const orderToDb = (o: Order) => ({
+  id: o.id,
+  customer_name: o.customerName,
+  phone: o.phone,
+  address: o.address,
+  product_id: o.productId,
+  product_title: o.productTitle,
+  price: o.price,
+  status: o.status,
+  notes: o.notes || null,
+  created_at: o.createdAt,
+  updated_at: o.updatedAt
+});
+
+export const orderFromDb = (d: any): Order => ({
+  id: d.id,
+  customerName: d.customer_name,
+  phone: d.phone,
+  address: d.address,
+  productId: d.product_id,
+  productTitle: d.product_title,
+  productType: 'product',
+  price: Number(d.price),
+  status: d.status,
+  notes: d.notes || undefined,
+  createdAt: d.created_at,
+  updatedAt: d.updated_at
+});
+
+export const purchaseToDb = (p: Purchase) => ({
+  id: p.id,
+  user_id: p.userId,
+  user_name: p.userName,
+  user_email: p.userEmail,
+  course_id: p.courseId,
+  course_title: p.courseTitle,
+  price: p.price,
+  payment_method: p.paymentMethod,
+  status: p.status,
+  purchased_at: p.purchasedAt
+});
+
+export const purchaseFromDb = (d: any): Purchase => ({
+  id: d.id,
+  userId: d.user_id,
+  userName: d.user_name,
+  userEmail: d.user_email,
+  courseId: d.course_id,
+  courseTitle: d.course_title,
+  price: Number(d.price),
+  paymentMethod: d.payment_method,
+  status: d.status,
+  purchasedAt: d.purchased_at
+});
+
+// ================== DATA SYNCING & FETCHING ==================
+
+/**
+ * Fetch all products from Supabase
+ */
+export const fetchProductsFromSupabase = async (): Promise<Product[] | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (error || !data) return null;
+    return data.map(productFromDb);
+  } catch (err) {
+    return null;
+  }
+};
+
+/**
+ * Fetch all courses from Supabase
+ */
+export const fetchCoursesFromSupabase = async (): Promise<Course[] | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+    if (error || !data) return null;
+    return data.map(courseFromDb);
+  } catch (err) {
+    return null;
+  }
+};
+
+/**
+ * Fetch all lessons from Supabase
+ */
+export const fetchLessonsFromSupabase = async (): Promise<Lesson[] | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from('lessons').select('*').order('order_index', { ascending: true });
+    if (error || !data) return null;
+    return data.map(lessonFromDb);
+  } catch (err) {
+    return null;
+  }
+};
+
 /**
  * Sync local products and courses to Supabase
  */
@@ -133,37 +361,48 @@ export const syncAllToSupabase = async (
   }
 
   try {
+    let syncedCount = 0;
+
     // 1. Sync Products
     if (products.length > 0) {
+      const dbProducts = products.map(productToDb);
       const { error: prodErr } = await supabase
         .from('products')
-        .upsert(products, { onConflict: 'id' });
+        .upsert(dbProducts, { onConflict: 'id' });
       if (prodErr && prodErr.code !== '42P01') {
         console.warn('Sync products warning:', prodErr);
+      } else {
+        syncedCount += products.length;
       }
     }
 
     // 2. Sync Courses
     if (courses.length > 0) {
+      const dbCourses = courses.map(courseToDb);
       const { error: crsErr } = await supabase
         .from('courses')
-        .upsert(courses, { onConflict: 'id' });
+        .upsert(dbCourses, { onConflict: 'id' });
       if (crsErr && crsErr.code !== '42P01') {
         console.warn('Sync courses warning:', crsErr);
+      } else {
+        syncedCount += courses.length;
       }
     }
 
     // 3. Sync Lessons
     if (lessons.length > 0) {
+      const dbLessons = lessons.map(lessonToDb);
       const { error: lesErr } = await supabase
         .from('lessons')
-        .upsert(lessons, { onConflict: 'id' });
+        .upsert(dbLessons, { onConflict: 'id' });
       if (lesErr && lesErr.code !== '42P01') {
         console.warn('Sync lessons warning:', lesErr);
+      } else {
+        syncedCount += lessons.length;
       }
     }
 
-    return { success: true, count: products.length + courses.length + lessons.length };
+    return { success: true, count: syncedCount };
   } catch (err: any) {
     return { success: false, count: 0, error: err.message };
   }

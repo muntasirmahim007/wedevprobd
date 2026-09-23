@@ -19,7 +19,17 @@ import {
   INITIAL_SETTINGS,
   INITIAL_NOTIFICATIONS
 } from '../data/initialData';
-import { getSupabaseClient } from './supabase';
+import {
+  getSupabaseClient,
+  productToDb,
+  courseToDb,
+  lessonToDb,
+  orderToDb,
+  purchaseToDb,
+  fetchProductsFromSupabase,
+  fetchCoursesFromSupabase,
+  fetchLessonsFromSupabase
+} from './supabase';
 
 const safeSupabaseSync = async (fn: () => PromiseLike<any>) => {
   try {
@@ -46,7 +56,7 @@ const notifySubscribers = (key: string) => {
   window.dispatchEvent(new CustomEvent('dsa_store_change', { detail: { key } }));
 };
 
-// Initialize Storage
+// Initialize Storage and sync from Supabase if connected
 export const initStorage = () => {
   if (!localStorage.getItem(STORAGE_KEYS.PRODUCTS)) {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
@@ -71,6 +81,28 @@ export const initStorage = () => {
   }
   if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(INITIAL_NOTIFICATIONS));
+  }
+
+  // Background fetch from Supabase
+  syncRemoteSupabaseToLocal();
+};
+
+export const syncRemoteSupabaseToLocal = async () => {
+  try {
+    const remoteProducts = await fetchProductsFromSupabase();
+    if (remoteProducts && remoteProducts.length > 0) {
+      setItem(STORAGE_KEYS.PRODUCTS, remoteProducts);
+    }
+    const remoteCourses = await fetchCoursesFromSupabase();
+    if (remoteCourses && remoteCourses.length > 0) {
+      setItem(STORAGE_KEYS.COURSES, remoteCourses);
+    }
+    const remoteLessons = await fetchLessonsFromSupabase();
+    if (remoteLessons && remoteLessons.length > 0) {
+      setItem(STORAGE_KEYS.LESSONS, remoteLessons);
+    }
+  } catch (err) {
+    // Ignore offline errors
   }
 };
 
@@ -115,7 +147,7 @@ export const saveProduct = (product: Product): void => {
   // Sync to Supabase if connected
   const supabase = getSupabaseClient();
   if (supabase) {
-    safeSupabaseSync(() => supabase.from('products').upsert(product));
+    safeSupabaseSync(() => supabase.from('products').upsert(productToDb(product)));
   }
 };
 export const deleteProduct = (id: string): void => {
@@ -142,7 +174,7 @@ export const saveCourse = (course: Course): void => {
 
   const supabase = getSupabaseClient();
   if (supabase) {
-    safeSupabaseSync(() => supabase.from('courses').upsert(course));
+    safeSupabaseSync(() => supabase.from('courses').upsert(courseToDb(course)));
   }
 };
 export const deleteCourse = (id: string): void => {
@@ -385,6 +417,12 @@ export const enrollUserInCourse = (
 
   purchases.unshift(newPurchase);
   setItem(STORAGE_KEYS.PURCHASES, purchases);
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    safeSupabaseSync(() => supabase.from('purchases').upsert(purchaseToDb(newPurchase)));
+  }
+
   return newPurchase;
 };
 
@@ -394,6 +432,11 @@ export const revokeCourseAccess = (purchaseId: string): void => {
   if (item) {
     item.status = 'revoked';
     setItem(STORAGE_KEYS.PURCHASES, purchases);
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      safeSupabaseSync(() => supabase.from('purchases').update({ status: 'revoked' }).eq('id', purchaseId));
+    }
   }
 };
 
